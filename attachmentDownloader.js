@@ -5,7 +5,7 @@
  *
  * If there is no task number (the related record is not a task) the directory name is the sys_id of the related record)
  *
- * Duplicate filenames are handled. A readme.txt file is stored in each directory pointing the user back to the source record
+ * Duplicate filenames are handled.
  *
  */
 
