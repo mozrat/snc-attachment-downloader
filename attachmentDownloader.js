@@ -9,10 +9,11 @@
  *
  */
 
-const instanceName = 'smorrsc2helsc';
-const userName = 'admin';
-const password = 'admin';
-const attachmentFilter = "table_nameINhr_task,incident";
+var config = require('./config');
+const instanceName = config.instanceName;
+const userName = config.userName;
+const password = config.password;
+const attachmentFilter = config.attachmentFilter;
 
 // ****** DO NOT EDIT BELOW THIS LINE ******
 const request = require('request');
@@ -58,6 +59,31 @@ function AttachmentHandler(att) {
         }
     };
 
+    this.getUniquePath = function (dirPath) {
+
+        // Ensure filename is unique
+        if (!fs.existsSync(dirPath)) {
+            return dirPath;
+        }
+
+        var uniqueFilename = false;
+        var x = 1;
+
+        while (!uniqueFilename) {
+            var ext = path.extname(dirPath);
+            var dirname = path.dirname(dirPath);
+            var filename = path.basename(dirPath, ext);
+            var newDirPath = dirname + path.sep + filename + '[' + x + ']' + ext;
+
+            if (!fs.existsSync(newDirPath)) {
+                uniqueFilename = true;
+                return newDirPath;
+            }
+
+            x++;
+        }
+    };
+
     this.writeAttachment = function () {
 
         var that = this;
@@ -65,6 +91,7 @@ function AttachmentHandler(att) {
         waterfall([
 
             function (callback) {
+                // create directory name for table
                 that.createDirectorySync(that.att.table_name);
 
                 // Get the task number for directory creation
@@ -97,6 +124,7 @@ function AttachmentHandler(att) {
 
             function (taskNumber, callback) {
 
+                // Create directory for task number
                 console.log('taskNumber=' + taskNumber);
                 var dirPath = path.join(that.att.table_name, taskNumber);
                 console.log('Creating directory: ' + dirPath);
@@ -105,9 +133,11 @@ function AttachmentHandler(att) {
                 callback(null, dirPath);
             },
 
+
             function (dirPath, callback) {
 
-                var filename = path.join(dirPath, that.att.file_name);
+                // Download attachment
+                var filename = that.getUniquePath(path.join(dirPath, that.att.file_name));
                 var file = fs.createWriteStream(filename);
                 var url = instanceUrl + '/api/now/v1/attachment/' + that.att.sys_id + '/file';
                 console.log('Downloading attachment: ' + filename + ' from url ' + url);
@@ -121,7 +151,9 @@ function AttachmentHandler(att) {
                     }
                 };
 
-                request(options).pipe(file, (function() { callback(null) }));
+                request(options).pipe(file, (function () {
+                    callback(null)
+                }));
 
             }
 
