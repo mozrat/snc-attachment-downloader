@@ -19,7 +19,6 @@ const request = require('request');
 const waterfall = require('async-waterfall');
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
 const instanceUrl = 'https://' + instanceName + '.service-now.com';
 
 

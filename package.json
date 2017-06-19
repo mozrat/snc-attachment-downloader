@@ -1,0 +1,23 @@
+{
+  "name": "attachmentdownloader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "attachmentDownloader.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mozrat/snc-attachment-downloader.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mozrat/snc-attachment-downloader/issues"
+  },
+  "homepage": "https://github.com/mozrat/snc-attachment-downloader#readme",
+  "dependencies": {
+    "async-waterfall": "^0.1.5",
+    "request": "^2.81.0"
+  }
+}
