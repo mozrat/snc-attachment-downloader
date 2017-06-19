@@ -19,6 +19,7 @@ const request = require('request');
 const waterfall = require('async-waterfall');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const instanceUrl = 'https://' + instanceName + '.service-now.com';
 
 
@@ -102,12 +103,26 @@ function AttachmentHandler(att) {
                 console.log('Creating directory: ' + dirPath);
 
                 that.createDirectorySync(dirPath);
-                callback(null, taskNumber);
+                callback(null, dirPath);
             },
 
-            function (callback, taskNumber) {
+            function (dirPath, callback) {
+
+                var filename = path.join(dirPath, that.att.file_name);
+                var file = fs.createWriteStream(filename);
+                var url = instanceUrl + '/api/now/v1/attachment/' + that.att.sys_id + '/file';
+                console.log('Downloading attachment: ' + filename + ' from url ' + url);
 
 
+                var options = {
+                    url: url,
+                    auth: {
+                        user: userName,
+                        password: password
+                    }
+                };
+
+                request(options).pipe(file, (function() { callback(null) }));
 
             }
 
