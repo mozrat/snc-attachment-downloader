@@ -79,7 +79,17 @@ function AttachmentHandler(att) {
         }
     };
 
+    this.cleanFileName = function (filename) {
+
+        var newFn = filename.replace(/[|&;$%@"<>()+,*]/g, "");
+        var newFn = newFn.replace(/[^\x00-\x7F]/g, "");
+
+        return newFn;
+    };
+
     this.getUniquePath = function (dirPath) {
+
+        dirPath = this.cleanFileName(dirPath);
 
         // Ensure filename is unique
         if (!fs.existsSync(dirPath)) {
