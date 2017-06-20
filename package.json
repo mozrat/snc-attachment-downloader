@@ -18,6 +18,7 @@
   "homepage": "https://github.com/mozrat/snc-attachment-downloader#readme",
   "dependencies": {
     "async-waterfall": "^0.1.5",
-    "request": "^2.81.0"
+    "request": "^2.81.0",
+    "winston": "^2.3.1"
   }
 }

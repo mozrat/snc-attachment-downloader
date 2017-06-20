@@ -14,14 +14,33 @@ const instanceName = config.instanceName;
 const userName = config.userName;
 const password = config.password;
 const attachmentFilter = config.attachmentFilter;
+const logfile = config.logfile;
 
-// ****** DO NOT EDIT BELOW THIS LINE ******
+if (!instanceName || !userName || !password || !attachmentFilter || !logfile) {
+    console.log('Bad configuration, exiting script');
+    process.exit(1);
+}
+
 const request = require('request');
 const waterfall = require('async-waterfall');
+const async = require('async');
 const path = require('path');
 const fs = require('fs');
-const instanceUrl = 'https://' + instanceName + '.service-now.com';
+const http = require('http');
+http.globalAgent.maxSockets = 5;
 
+const instanceUrl = 'https://' + instanceName + '.service-now.com';
+const logger = require('winston');
+logger.configure({
+    transports: [
+        new (logger.transports.Console)(),
+        new (logger.transports.File)({filename: logfile})
+    ]
+});
+
+var percentTotal = 0;
+var percentCompleted = 0;
+var percentageComplete = 0;
 
 function AttachmentHandler(att) {
 
@@ -55,6 +74,7 @@ function AttachmentHandler(att) {
         var dirName = path.join(__dirname, dir);
 
         if (!fs.existsSync(dirName)) {
+            logger.info('Creating directory %s', dirName);
             fs.mkdirSync(dirName);
         }
     };
@@ -76,6 +96,7 @@ function AttachmentHandler(att) {
             var newDirPath = dirname + path.sep + filename + '[' + x + ']' + ext;
 
             if (!fs.existsSync(newDirPath)) {
+                logger.info('Duplicate filename, had to amend: %s', newDirPath);
                 uniqueFilename = true;
                 return newDirPath;
             }
@@ -84,7 +105,7 @@ function AttachmentHandler(att) {
         }
     };
 
-    this.writeAttachment = function () {
+    this.writeAttachment = function (cb) {
 
         var that = this;
 
@@ -103,10 +124,12 @@ function AttachmentHandler(att) {
                     }
                 };
 
+                logger.info('Resolving task number for attachment: %s', that.att.sys_id);
+
                 request(options, function (error, response, body) {
 
                     if (error) {
-                        console.log("ERROR!", error);
+                        logger.error("ERROR!", error);
                         return callback(error);
                     }
 
@@ -125,9 +148,7 @@ function AttachmentHandler(att) {
             function (taskNumber, callback) {
 
                 // Create directory for task number
-                console.log('taskNumber=' + taskNumber);
                 var dirPath = path.join(that.att.table_name, taskNumber);
-                console.log('Creating directory: ' + dirPath);
 
                 that.createDirectorySync(dirPath);
                 callback(null, dirPath);
@@ -140,7 +161,7 @@ function AttachmentHandler(att) {
                 var filename = that.getUniquePath(path.join(dirPath, that.att.file_name));
                 var file = fs.createWriteStream(filename);
                 var url = instanceUrl + '/api/now/v1/attachment/' + that.att.sys_id + '/file';
-                console.log('Downloading attachment: ' + filename + ' from url ' + url);
+                logger.info('Downloading attachment: ' + filename + ' from url ' + url);
 
 
                 var options = {
@@ -151,13 +172,22 @@ function AttachmentHandler(att) {
                     }
                 };
 
-                request(options).pipe(file, (function () {
-                    callback(null)
-                }));
+                request(options)
+                    .on('complete', function () {
+                        percentCompleted++;
+                        percentageComplete = parseInt(percentCompleted / percentTotal * 100);
 
-            }
+                        logger.info('DOWNLOAD PROGRESS: %d%', percentageComplete);
+                        callback(null);
+                    })
+                    .pipe(file, (function () {
+
+                    }));
+
+            },
 
         ], function (err) {
+            cb();
         });
 
 
@@ -171,6 +201,8 @@ waterfall([
     function (callback) {
 
         // Get a list of all attachments matching the filter and pass to next function
+        logger.info('Starting download of attachments');
+        logger.info('config: %j', config);
         const attachments = [];
 
         var options = {
@@ -183,32 +215,49 @@ waterfall([
 
         request(options, function (error, response, body) {
 
+            logger.info('Querying sys_attachment table.');
+
             if (error) {
-                console.log("ERROR!", error);
+                logger.error('Error: %j', body);
+                process.exit(1);
                 return callback(error);
             }
 
             if (!error && response.statusCode !== 200) {
-                console.log("ERROR!", error);
+                logger.error('Error: statusCode: ', response.statusCode);
+                process.exit(1);
                 return callback(error);
             }
 
             body = JSON.parse(body);
+
+            var counter = 1;
+            percentTotal = body.result.length;
+            logger.info('Iterating over %d attachments', percentTotal);
+
             body.result.forEach(function (att) {
                 attachments.push(att);
+
+                if (counter === body.result.length) {
+                    callback(null, attachments);
+                }
+
+                counter++;
             });
 
-            callback(null, attachments);
+
         });
     },
 
     function (attachments, callback) {
 
-        console.log('Found attachments: ' + attachments.length);
-        attachments.forEach(function (att) {
+        logger.info('Seen %d attachments from instance', attachments.length);
+
+        async.eachOfLimit(attachments, 5, function (att, key, callback) {
             var a = new AttachmentHandler(att);
-            a.writeAttachment();
+            a.writeAttachment(callback);
         });
+
     }
 
 ], function (err, result) {
